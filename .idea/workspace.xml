@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="BranchesTreeState">
+    <expand>
+      <path>
+        <item name="ROOT" type="e8cecc67:BranchNodeDescriptor" />
+        <item name="LOCAL_ROOT" type="e8cecc67:BranchNodeDescriptor" />
+      </path>
+    </expand>
+    <select />
+  </component>
+  <component name="CMakeRunConfigurationManager" shouldGenerate="true" shouldDeleteObsolete="true">
+    <generated />
+  </component>
+  <component name="CMakeSettings">
+    <configurations>
+      <configuration PROFILE_NAME="Debug" CONFIG_NAME="Debug" />
+    </configurations>
+  </component>
+  <component name="CargoProjects">
+    <cargoProject FILE="$PROJECT_DIR$/Cargo.toml" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="3d4a71fd-00d7-4657-a551-7c7eb1311ea2" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/chess-player.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/bin/test/gameboard.rs" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/bin/test/main.rs" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="ClangdSettings">
+    <option name="formatViaClangd" value="false" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Rust File" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="MacroExpansionManager">
+    <option name="directoryName" value="b0a8si5u" />
+  </component>
+  <component name="ProjectId" id="1j7jpNeCHvJJCUuoCvnel5h9WJn" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="cf.first.check.clang-format" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/src/bin/test" />
+    <property name="nodejs_package_manager_path" value="npm" />
+    <property name="org.rust.cargo.project.model.PROJECT_DISCOVERY" value="true" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src/bin/test" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/src/bin/test" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Cargo.Run">
+    <configuration name="Run" type="CargoCommandRunConfiguration" factoryName="Cargo Command" nameIsGenerated="true">
+      <option name="channel" value="DEFAULT" />
+      <option name="command" value="run --bin test" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Test" type="CargoCommandRunConfiguration" factoryName="Cargo Command">
+      <option name="channel" value="DEFAULT" />
+      <option name="command" value="test --package chess-player --lib tests" />
+      <option name="allFeatures" value="false" />
+      <option name="emulateTerminal" value="false" />
+      <option name="backtrace" value="SHORT" />
+      <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+      <envs />
+      <method v="2">
+        <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+      </method>
+    </configuration>
+    <list>
+      <item itemvalue="Cargo.Test" />
+      <item itemvalue="Cargo.Run" />
+    </list>
+  </component>
+  <component name="RustProjectSettings">
+    <option name="toolchainHomeDirectory" value="/usr/bin" />
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="3d4a71fd-00d7-4657-a551-7c7eb1311ea2" name="Default Changelist" comment="" />
+      <created>1603162206164</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1603162206164</updated>
+      <workItem from="1603162207354" duration="25175000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="424" y="180" width="1071" height="708" key="#com.intellij.execution.impl.EditConfigurationsDialog" timestamp="1603170395773">
+      <screen x="0" y="0" width="1920" height="1044" />
+    </state>
+    <state x="424" y="180" width="1071" height="708" key="#com.intellij.execution.impl.EditConfigurationsDialog/0.0.1920.1044@0.0.1920.1044" timestamp="1603170395773" />
+    <state x="748" y="280" key="FileChooserDialogImpl" timestamp="1603170407445">
+      <screen x="0" y="0" width="1920" height="1044" />
+    </state>
+    <state x="748" y="280" key="FileChooserDialogImpl/0.0.1920.1044@0.0.1920.1044" timestamp="1603170407445" />
+    <state width="1876" height="276" key="GridCell.Tab.0.bottom" timestamp="1603223899815">
+      <screen x="0" y="0" width="1920" height="1044" />
+    </state>
+    <state width="1876" height="276" key="GridCell.Tab.0.bottom/0.0.1920.1044@0.0.1920.1044" timestamp="1603223899815" />
+    <state width="1876" height="276" key="GridCell.Tab.0.center" timestamp="1603223899814">
+      <screen x="0" y="0" width="1920" height="1044" />
+    </state>
+    <state width="1876" height="276" key="GridCell.Tab.0.center/0.0.1920.1044@0.0.1920.1044" timestamp="1603223899814" />
+    <state width="1876" height="276" key="GridCell.Tab.0.left" timestamp="1603223899812">
+      <screen x="0" y="0" width="1920" height="1044" />
+    </state>
+    <state width="1876" height="276" key="GridCell.Tab.0.left/0.0.1920.1044@0.0.1920.1044" timestamp="1603223899812" />
+    <state width="1876" height="276" key="GridCell.Tab.0.right" timestamp="1603223899814">
+      <screen x="0" y="0" width="1920" height="1044" />
+    </state>
+    <state width="1876" height="276" key="GridCell.Tab.0.right/0.0.1920.1044@0.0.1920.1044" timestamp="1603223899814" />
+    <state width="1876" height="238" key="GridCell.Tab.1.bottom" timestamp="1603223493249">
+      <screen x="0" y="0" width="1920" height="1044" />
+    </state>
+    <state width="1876" height="238" key="GridCell.Tab.1.bottom/0.0.1920.1044@0.0.1920.1044" timestamp="1603223493249" />
+    <state width="1876" height="238" key="GridCell.Tab.1.center" timestamp="1603223493248">
+      <screen x="0" y="0" width="1920" height="1044" />
+    </state>
+    <state width="1876" height="238" key="GridCell.Tab.1.center/0.0.1920.1044@0.0.1920.1044" timestamp="1603223493248" />
+    <state width="1876" height="238" key="GridCell.Tab.1.left" timestamp="1603223493247">
+      <screen x="0" y="0" width="1920" height="1044" />
+    </state>
+    <state width="1876" height="238" key="GridCell.Tab.1.left/0.0.1920.1044@0.0.1920.1044" timestamp="1603223493247" />
+    <state width="1876" height="238" key="GridCell.Tab.1.right" timestamp="1603223493248">
+      <screen x="0" y="0" width="1920" height="1044" />
+    </state>
+    <state width="1876" height="238" key="GridCell.Tab.1.right/0.0.1920.1044@0.0.1920.1044" timestamp="1603223493248" />
+  </component>
+</project>
