@@ -1,5 +1,6 @@
 use chess::{Board, Square, Rank, File, Piece, Color};
 
+//Prints the letters and then calls draw_horizontal to draw the rest of the board.
 pub fn draw(baord: Box<Board>) {
     println!("   A   B   C   D   E   F   G   H   ");
     for i in 1..18 {
@@ -7,6 +8,7 @@ pub fn draw(baord: Box<Board>) {
     }
 }
 
+//Print a horizontal row.  Chooses what to print based on the index.
 fn draw_horizontal(count: i32, board: Box<Board>) {
     if count == 1 {
         println!(" ┌───┬───┬───┬───┬───┬───┬───┬───┐");
@@ -17,10 +19,6 @@ fn draw_horizontal(count: i32, board: Box<Board>) {
         for i in 0..=7 {
             squares.push(get_square(((count / 2) - 1) as usize, i));
         }
-        // println!("{}│ {} │ {} │ {} │ {} │ {} │ {} │ {} │ {} │", count / 2,
-        //     draw_piece(board.piece_on(Square::make_square(Rank::from_index(0), File::from_index((count / 2) as usize))), board.color_on()),
-        //
-        // );
         print!("{}│", count / 2);
         for s in squares {
             print!(" {} │", draw_piece(board.piece_on(s), board.color_on(s).unwrap_or(Color::Black)) )
@@ -31,10 +29,12 @@ fn draw_horizontal(count: i32, board: Box<Board>) {
     }
 }
 
+//Returns a Square from a rank and file.
 fn get_square(rank: usize, file: usize) -> Square {
     Square::make_square(Rank::from_index(rank), File::from_index(file))
 }
 
+//Converts a piece and color into a unicode character.
 fn draw_piece(piece: Option<Piece>, color: Color) -> String {
     match piece {
         Some(p) => {

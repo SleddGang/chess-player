@@ -1,8 +1,10 @@
 use chess_player::do_move;
 
-use chess::{Board, Color, Square, ChessMove, BoardStatus};
+use chess::{Board, Color, Square, ChessMove, BoardStatus, Game, BitBoard};
 use dialoguer::Input;
 use dialoguer::theme::ColorfulTheme;
+use std::process::exit;
+use std::sync::Arc;
 
 mod gameboard;
 
@@ -11,20 +13,43 @@ fn main() {
 
     let board = Box::new(Board::default());
     println!("{}", board.piece_on(Square::C1).unwrap());
-    // gameboard::draw(board);
-    // make_move(String::from("A2"), String::from("A3"), board);
     game_loop(board);
 }
 
+//Runs update once and then enters a loop checking if the input is q.
 fn game_loop(board: Box<Board>) {
+    //Game is only used to check if there should be a draw.
+    let mut game = Game::new_with_board(*board.clone());
+
+    //Boards is a history of BitBoards.
+    let mut boards = vec![];
+    //Result is a touple of the user input and board after the next move.
+    let mut result = (String::new(), board.clone());
+    //Counts the number of moves for debugging purposes.
+    let mut count = 1;
+
+    //draw the gameboard on screen.
     gameboard::draw(board.clone());
-    let mut result = update(board.clone());
+
+    //Run the loop once so the user can quit on the first prompt.
+    result = update(board.clone(), Arc::new(boards.clone()), &mut game);
+    boards.push(*result.1.color_combined(board.side_to_move()));
+
     while result.0 != String::from("Q") {
-        result = update(result.1.clone());
+        result = update(result.1.clone(), Arc::new(boards.clone()), &mut game);
+        boards.push(*result.1.color_combined(board.side_to_move()));
+        count += 1;
+        println!("{}", count);
     }
 }
 
-fn update(board: Box<Board>) -> (String, Box<Board>) {
+//Gets the user or ai input and moves the pieces.
+fn update(board: Box<Board>, boards: Arc<Vec<BitBoard>>, game: &mut Game) -> (String, Box<Board>) {
+    if game.can_declare_draw() {
+        // game.declare_draw();
+        println!("Draw");
+        // exit(0);
+    }
     let status = match board.status() {
         BoardStatus::Checkmate => "Checkmate",
         BoardStatus::Stalemate => "Stalemate",
@@ -35,11 +60,13 @@ fn update(board: Box<Board>) -> (String, Box<Board>) {
     // get_input(board.clone(), "");
 
     let piece = String::new();
+
+    //Uncomment for user input on White.
     // if board.side_to_move() == Color::White {
     //     let piece: String = get_input(board.clone(),"Select a piece");
     //     let to = get_input(board.clone(), "Select a space to move to");
     //
-    //     let result = match make_move(&piece, &to, board.clone()) {
+    //     let result = match make_move(&piece, &to, board.clone(), game) {
     //         Some(r) => Box::new(r),
     //         None => return (piece, board)
     //     };
@@ -47,8 +74,9 @@ fn update(board: Box<Board>) -> (String, Box<Board>) {
     //     gameboard::draw(result.clone());
     //     return (piece, result.into());
     // } else {
-        let result = Box::new(make_ai_move(do_move(board.clone(), board.side_to_move()).unwrap_or_default(), board));
+        let result = Box::new(make_ai_move(do_move(board.clone(), board.side_to_move(), boards).unwrap_or_default(), board, game));
         gameboard::draw(result.clone());
+
         return (piece, result.into());
     // }
 
@@ -56,6 +84,7 @@ fn update(board: Box<Board>) -> (String, Box<Board>) {
     // return (piece, result.into());
 }
 
+//Get human input with prompt.
 fn get_input(board: Box<Board>, prompt: &str) -> String {
     Input::<String>::with_theme(&ColorfulTheme::default())
         .with_prompt(format!("{} {}",prompt, match board.side_to_move() {
@@ -67,7 +96,8 @@ fn get_input(board: Box<Board>, prompt: &str) -> String {
         .to_uppercase()
 }
 
-fn make_move(piece: &String, to: &String, board: Box<Board>) -> Option<Board> {
+//Move a piece based on user input.
+fn make_move(piece: &String, to: &String, board: Box<Board>, game: &mut Game) -> Option<Board> {
     let piece_square = Square::from_string(piece.to_lowercase());
     let to_square = Square::from_string(to.to_lowercase());
     if (piece_square == None) || (to_square == None) {
@@ -80,15 +110,14 @@ fn make_move(piece: &String, to: &String, board: Box<Board>) -> Option<Board> {
     }
     let mut result = Board::default();
     board.make_move(m, &mut result);
+    game.make_move(m);
     return Some(result)
 }
 
-fn make_ai_move(m: ChessMove, board: Box<Board>) -> Board {
+//Move a piece based on ai input.
+fn make_ai_move(m: ChessMove, board: Box<Board>, game: &mut Game) -> Board {
     let mut result = Board::default();
     board.make_move(m, &mut result);
+    game.make_move(m);
     return result
-}
-
-fn is_valid(input: &String) {
-
 }

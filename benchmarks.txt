@@ -1,0 +1,2 @@
+molly: DEPTH=5 208,369,841, 210,118,422 ns/iter #Initial ai.  Before attempting to stop repeated moves.
+molly: DEPTH=5 189,583,841 #With RUSTFLAGS="-C target-cpu=native"
