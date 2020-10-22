@@ -1,0 +1,33 @@
+name: Rust
+
+on:
+  push:
+    branches: [ master, dev, feature/actions ]
+  pull_request:
+    branches: [ master, dev, feature/actions ]
+
+env:
+  CARGO_TERM_COLOR: always
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: ubuntu-latest
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - uses: actions/checkout@v2
+
+      # Runs a single command using the runners shell
+      - uses: actions/checkout@v2
+      - name: Install latest nightly
+        uses: actions-rs/toolchain@v1
+        with:
+            toolchain: nightly-2020-06-06
+            override: true
+#             components: rustfmt, clippy
+      - name: Run cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
