@@ -5,6 +5,7 @@ Cargo.lock
 #VSCode
 .vscode/
 .history/
+*.code-workspace
 
 #Idea
 .idea/
