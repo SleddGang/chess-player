@@ -158,7 +158,6 @@ fn check_moves(board: Box<Board>, color: Color, mut depth: isize,  boards: Arc<V
         return None;
     }
 
-
     let it = MoveGen::new_legal(&board);               //Get a iterator of next legal moves.
     let mut moves: Vec<(ChessMove, f64, isize)> = vec![];       //Initialize a vector of empty moves and points that the move could lead to.
     let max_depth = depth;                                //Currently not used.  TODO remember why I put this in here.
@@ -233,11 +232,20 @@ fn check_moves(board: Box<Board>, color: Color, mut depth: isize,  boards: Arc<V
 //Check to make see if the BitBoard of board is found in boards more than once.
 //Returns true if the threefold criteria is met.  Otherwise returns false.
 fn is_threefold(board: BitBoard, boards: Arc<Vec<BitBoard>>) -> bool {
-    if boards.iter().filter(|&b| *b == board).count() >= 2 {
+    // if boards.iter().filter(|&b| *b == board).count() >= 2 {
         // println!("Threefold");
-        return true;
+        // return true;
+    // }
+    let mut count: usize = 0;
+    for i in boards.iter() {
+        if *i == board {
+            count += 1;
+            if count >= 2 {
+                return true;
+            }
+        }
     }
-    return false;
+    false
 }
 
 //Match a Chess Piece to a score.
