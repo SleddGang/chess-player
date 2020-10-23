@@ -61,7 +61,7 @@ fn update(board: Box<Board>, boards: Arc<Vec<BitBoard>>, game: &mut Game) -> (St
 
     let piece = String::new();
 
-    //Uncomment for user input on White.
+    // Uncomment for user input on White.
     // if board.side_to_move() == Color::White {
     //     let piece: String = get_input(board.clone(),"Select a piece");
     //     let to = get_input(board.clone(), "Select a space to move to");
@@ -75,6 +75,7 @@ fn update(board: Box<Board>, boards: Arc<Vec<BitBoard>>, game: &mut Game) -> (St
     //     return (piece, result.into());
     // } else {
         let result = Box::new(make_ai_move(do_move(board.clone(), board.side_to_move(), boards).unwrap_or_default(), board, game));
+        println!("#");
         gameboard::draw(result.clone());
 
         return (piece, result.into());
