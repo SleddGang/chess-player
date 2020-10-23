@@ -1,5 +1,7 @@
 #![feature(test)]
 
+mod openings;
+
 use chess::{Board, ChessMove, Color, MoveGen, Piece, BoardStatus, BitBoard};
 use threadpool::ThreadPool;
 use std::sync::mpsc::channel;
@@ -45,6 +47,11 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
     //Check to make sure the ai is moving next.
     if board.side_to_move() != color {
         return None
+    }
+
+    match openings::openings(board.clone(), previous_boards.clone()) {
+        Some(s)=>return Some(s), 
+        None=> {}
     }
 
     let it = MoveGen::new_legal(&board);                     //Get a iterator of next legal moves.
