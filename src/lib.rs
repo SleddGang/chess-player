@@ -34,7 +34,7 @@ static OUTCOMES: Outcomes = Outcomes {
 };
 
 const NUMTHREADS: usize = 8;            //NUMTHREADS is the number of threads to run the ai on.
-const MAXDEPTH: isize = 4;              //The max number of moves run.
+const MAXDEPTH: isize = 5;              //The max number of moves run.
 const OUTCOMESMULTIPLIER: f64 = 2.5;    //Number to multiply the outcomes by.
 // const NEXTMOVEMULTIPLIER: f64 = 2.0; //A higher number increases the points that
 const TAKEPIECEMULTIPLIER: f64 = 1.01;  //Applied when taking a piece not when losing a piece.
@@ -87,7 +87,7 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
             };
 
             if !is_threefold(*result.combined(), previous_boards.clone()) {
-                match search_min(0.0, 0.0, Box::new(result), 1, score, previous_boards.clone()) {
+                match search_min(f64::MIN, f64::MAX, Box::new(result), 1, score, previous_boards.clone()) {
                     Some(s) => {
                         // println!("Score: {}", s);
                         tx.send(Some((i, s + score, 0)));
@@ -177,11 +177,12 @@ fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, to
                     Some(s) => {
                         score += s;
                         scores.push(score);
-                        // if score >= beta {
-                        //     return Some(beta)
-                        // } else if score > alpha {
-                        //     alpha = score;
-                        // }
+                        if score >= beta {
+                            // println!("Pruned max score: {} beta: {}", score, beta);
+                            return Some(beta)
+                        } else if score > alpha {
+                            alpha = score;
+                        }
                     },
                     None => {}
                 };
@@ -254,11 +255,12 @@ fn search_min(alpha: f64, mut beta: f64, board: Box<Board>, mut depth: isize, to
                     Some(s) => {
                         score += s;
                         scores.push(score);
-                        // if score <= alpha {
-                        //     return Some(alpha)
-                        // } else if score < beta {
-                        //     beta = score;
-                        // }
+                        if score <= alpha {
+                            // println!("Pruned min score: {} alpha: {}", score, alpha);
+                            return Some(alpha)
+                        } else if score < beta {
+                            beta = score;
+                        }
                     },
                     None => {}
                 };
