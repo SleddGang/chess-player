@@ -39,8 +39,11 @@ const OUTCOMESMULTIPLIER: f64 = 2.5;    //Number to multiply the outcomes by.
 // const NEXTMOVEMULTIPLIER: f64 = 2.0; //A higher number increases the points that
 const TAKEPIECEMULTIPLIER: f64 = 1.01;  //Applied when taking a piece not when losing a piece.
 
-//Main entry point for the ai.  Board is the current board state, color is the color of the side the bot is on, and previous_boards is a vector of all the previous
-//BitBoards and is used to enforce the threefold rule in the ai.
+/// Main entry point for the ai.  Board is the current board state,
+/// color is the color of the side the bot is on, and previous_boards is a vector of all the previous
+/// BitBoards and is used to enforce the threefold rule in the ai.
+/// Inside pool.execute() the code is very similar to search_max() however later we may want to add some
+/// top level specific code.
 pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoard>>) -> Option<ChessMove> {
     //Check to make sure the ai is moving next.
     if board.side_to_move() != color {
@@ -107,7 +110,7 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
         };
     }
 
-    //If the lenght of moves is zero then return none.  Otherwise find the move with the highest score and return it.
+    //If the length of moves is zero then return none.  Otherwise find the move with the highest score and return it.
     if moves.len() > 0 {
         let mut max: f64 = moves.get(0).unwrap().1;
         let mut selected_move = moves.get(0).unwrap().0;
@@ -124,6 +127,10 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
     // return Some(ChessMove::new(Square::A1, Square::A2, None))
 }
 
+/// Searches all possible moves for a given board and returns the maximum score plus the score of search_min().
+/// This function is used to find the highest score possible for any given board assuming the opponent chooses
+/// The path that costs the ai the most amount of points.  Effectively it chooses the move with the highest guaranteed score.
+/// This function is only called on ai moves.
 fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, total_score: f64, previous_boards: Arc<Vec<BitBoard>>) -> Option<f64> {
     //Add one the the depth.
     depth += 1;
@@ -131,8 +138,10 @@ fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, to
     let it = MoveGen::new_legal(&board);
     let mut scores = vec![];
 
+    //Loop through each possible move.
     for i in it {
-        let target = board.piece_on(i.get_dest());  //Gets the target piece of the move.  None if there is no target piece.
+        //Gets the target piece of the move.  None if there is no target piece.
+        let target = board.piece_on(i.get_dest());
 
         //Make a the move and put the board in result.
         let mut result = Board::from(*board.clone());
@@ -140,6 +149,7 @@ fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, to
 
         let mut score = 0.0;
 
+        //If the target square is a piece then add the taken pieces points to score.
         match target {
             Some(t) => {
                 score += match_piece(t);
@@ -147,6 +157,7 @@ fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, to
             None => {}
         };
 
+        //If this move leads to checkmate then add the checkmate points to score.
         match result.status() {
             BoardStatus::Checkmate => {
                 score += OUTCOMES.their_checkmate;
@@ -154,9 +165,13 @@ fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, to
             _ => {}
         };
 
+        //Add previous total scores to score.
         score += total_score;
 
+        //Check if this move breaks the threefold rule.
         if !is_threefold(*result.combined(), previous_boards.clone()) {
+            //Check if we are too deep.  If not then add the result of search_min() to the score and add score to scores.\
+            //Otherwise just add score to scores.
             if depth < MAXDEPTH {
                 match search_min(alpha, beta, Box::new(result), depth, score, previous_boards.clone()) {
                     Some(s) => {
@@ -176,6 +191,7 @@ fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, to
         }
     }
 
+    //Check to make sure we have some scores and if so find the highest score and return it.
     if scores.len() > 0 {
         let mut max = *scores.get(0).expect("Error unwrapping score.");
         for score in scores {
@@ -188,6 +204,10 @@ fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, to
     return None;
 }
 
+/// Searches all possible moves for a given board and returns the minimum score plus the score of search_max().
+/// This function is used to find the lowest score possible for any given board assuming the ai chooses
+/// The path that guarantees the ai the most amount of points.  Effectively it chooses the move with the lowest guaranteed score.
+/// This function is only called on opponent moves.
 fn search_min(alpha: f64, mut beta: f64, board: Box<Board>, mut depth: isize, total_score: f64, previous_boards: Arc<Vec<BitBoard>>) -> Option<f64> {
     //Add one the the depth.
     depth += 1;
@@ -195,8 +215,10 @@ fn search_min(alpha: f64, mut beta: f64, board: Box<Board>, mut depth: isize, to
     let it = MoveGen::new_legal(&board);
     let mut scores = vec![];
 
+    //Loop through each possible move.
     for i in it {
-        let target = board.piece_on(i.get_dest());  //Gets the target piece of the move.  None if there is no target piece.
+        //Gets the target piece of the move.  None if there is no target piece.
+        let target = board.piece_on(i.get_dest());
 
         //Make a the move and put the board in result.
         let mut result = Board::from(*board.clone());
@@ -204,12 +226,15 @@ fn search_min(alpha: f64, mut beta: f64, board: Box<Board>, mut depth: isize, to
 
         let mut score = 0.0;
 
+        //If the target square is a piece then subtract the taken pieces points to score.
         match target {
             Some(t) => {
                 score -= match_piece(t);
             },
             None => {}
         };
+
+        //If this move leads to checkmate then subtract the checkmate points to score.
         match result.status() {
             BoardStatus::Checkmate => {
                 score -= OUTCOMES.my_checkmate;
@@ -217,9 +242,13 @@ fn search_min(alpha: f64, mut beta: f64, board: Box<Board>, mut depth: isize, to
             _ => {}
         };
 
+        //Add previous total scores to score.
         score += total_score;
 
+        //Check if this move breaks the threefold rule.
         if !is_threefold(*result.combined(), previous_boards.clone()) {
+            //Check if we are too deep.  If not then add the result of search_min() to the score and add score to scores.\
+            //Otherwise just add score to scores.
             if depth < MAXDEPTH {
                 match search_max(alpha, beta, Box::new(result), depth, score, previous_boards.clone()) {
                     Some(s) => {
@@ -239,6 +268,7 @@ fn search_min(alpha: f64, mut beta: f64, board: Box<Board>, mut depth: isize, to
         }
     }
 
+    //Check to make sure we have some scores and if so find the lowest score and return it.
     if scores.len() > 0 {
         let mut min = *scores.get(0).expect("Error unwrapping score.");
         for score in scores {
@@ -251,8 +281,8 @@ fn search_min(alpha: f64, mut beta: f64, board: Box<Board>, mut depth: isize, to
     return None;
 }
 
-//Check to make see if the BitBoard of board is found in boards more than once.
-//Returns true if the threefold criteria is met.  Otherwise returns false.
+/// Check to make see if the BitBoard of board is found in boards more than once.
+/// Returns true if the threefold criteria is met.  Otherwise returns false.
 fn is_threefold(board: BitBoard, boards: Arc<Vec<BitBoard>>) -> bool {
     if boards.iter().filter(|&b| *b == board).count() >= 2 {
         // println!("Threefold");
@@ -261,7 +291,7 @@ fn is_threefold(board: BitBoard, boards: Arc<Vec<BitBoard>>) -> bool {
     return false;
 }
 
-//Match a Chess Piece to a score.
+/// Match a Chess Piece to a score.
 fn match_piece(piece: Piece) -> f64 {
     match piece {
         Piece::Rook => OUTCOMES.rook,
