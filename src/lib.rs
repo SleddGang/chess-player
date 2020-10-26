@@ -3,7 +3,7 @@
 use chess::{Board, ChessMove, Color, MoveGen, Piece, BoardStatus, BitBoard};
 use threadpool::ThreadPool;
 use std::sync::mpsc::channel;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 //Outcomes is a struct to organize all the possible point values.
 pub struct Outcomes {
@@ -34,7 +34,7 @@ static OUTCOMES: Outcomes = Outcomes {
 };
 
 const NUMTHREADS: usize = 8;            //NUMTHREADS is the number of threads to run the ai on.
-const MAXDEPTH: isize = 5;              //The max number of moves run.
+const MAXDEPTH: isize = 6;              //The max number of moves run.
 const OUTCOMESMULTIPLIER: f64 = 2.5;    //Number to multiply the outcomes by.
 // const NEXTMOVEMULTIPLIER: f64 = 2.0; //A higher number increases the points that
 const TAKEPIECEMULTIPLIER: f64 = 1.01;  //Applied when taking a piece not when losing a piece.
@@ -56,6 +56,9 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
                                                                             //The final move will be selected from this vector.
     let pool = ThreadPool::new(NUMTHREADS);     //Thread pool which will run the ai.
 
+    let global_alpha = Arc::new(Mutex::new(f64::MIN));
+    let global_beta = Arc::new(Mutex::new(f64::MAX));
+
     //Thread safe message passing.  Used to pass out the moves and scores out of the thread.
     let (tx, rx) = channel();
     //Loop through each possible move.
@@ -72,6 +75,7 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
             board.make_move(i, &mut result);
 
             let mut score = 0.0;
+            let mut is_mate = false;
 
             match target {
                 Some(t) => {
@@ -82,21 +86,27 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
             match board.status() {
                 BoardStatus::Checkmate => {
                     score += OUTCOMES.their_checkmate;
+                    is_mate = true;
                 },
                 _ => {}
             };
 
-            if !is_threefold(*result.combined(), previous_boards.clone()) {
-                match search_min(f64::MIN, f64::MAX, Box::new(result), 1, score, previous_boards.clone()) {
-                    Some(s) => {
-                        // println!("Score: {}", s);
-                        tx.send(Some((i, s + score, 0)));
-                    }
-                    None => {
-                        tx.send(None);
-                    }
+            let mut their_score = 0.0;
+            // if !is_threefold(*result.combined(), previous_boards.clone()) {
+                if !is_mate {
+                    match search_min(f64::MIN, f64::MAX, Box::new(result), 1, score, previous_boards.clone()) {
+                        Some(s) => {
+                            // println!("Score: {}", s);
+                            // tx.send(Some((i, s + score, 0)));
+                            their_score = s;
+                        }
+                        None => {
+                            // tx.send(None);
+                        }
+                    };
                 }
-            }
+                tx.send(Some((i, their_score + score, 0)));
+            // }
         })
     }
 
@@ -131,7 +141,7 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
 /// This function is used to find the highest score possible for any given board assuming the opponent chooses
 /// The path that costs the ai the most amount of points.  Effectively it chooses the move with the highest guaranteed score.
 /// This function is only called on ai moves.
-fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, total_score: f64, previous_boards: Arc<Vec<BitBoard>>) -> Option<f64> {
+fn search_max(mut alpha: f64, beta: f64, mut global_alpha: Arc<Mutex<f64>>, global_beta: Arc<Mutex<f64>>, board: Box<Board>, mut depth: isize, total_score: f64, previous_boards: Arc<Vec<BitBoard>>) -> Option<f64> {
     //Add one the the depth.
     depth += 1;
 
@@ -148,11 +158,13 @@ fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, to
         board.make_move(i, &mut result);
 
         let mut score = 0.0;
+        let mut is_mate = false;
 
         //If the target square is a piece then add the taken pieces points to score.
         match target {
             Some(t) => {
                 score += match_piece(t);
+                is_mate = true;
             },
             None => {}
         };
@@ -169,27 +181,47 @@ fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, to
         score += total_score;
 
         //Check if this move breaks the threefold rule.
-        if !is_threefold(*result.combined(), previous_boards.clone()) {
+        // if !is_threefold(*result.combined(), previous_boards.clone()) {
             //Check if we are too deep.  If not then add the result of search_min() to the score and add score to scores.\
             //Otherwise just add score to scores.
+            let mut their_score = 0.0;
             if depth < MAXDEPTH {
-                match search_min(alpha, beta, Box::new(result), depth, score, previous_boards.clone()) {
-                    Some(s) => {
-                        score += s;
-                        scores.push(score);
-                        if score >= beta {
-                            // println!("Pruned max score: {} beta: {}", score, beta);
-                            return Some(beta)
-                        } else if score > alpha {
-                            alpha = score;
+                if !is_mate {
+                    match search_min(alpha, beta, Box::new(result), depth, score, previous_boards.clone()) {
+                        Some(s) => {
+                            their_score = s;
+
+                            // score += s;
+                            // scores.push(score);
+                            // if score >= beta {
+                            //     // println!("Pruned max score: {} beta: {}", score, beta);
+                            //     return Some(beta)
+                            // } else if score > alpha {
+                            //     alpha = score;
+                            // }
+                        },
+                        None => {
+
                         }
-                    },
-                    None => {}
-                };
+                    };
+                }
+                score += their_score;
+                scores.push(score);
+                if score >= beta {
+                    // println!("Pruned max score: {} beta: {}", score, beta);
+                    return Some(beta)
+                } else if score > alpha {
+                    let mut ga = global_alpha.lock().unwrap();
+                    if score > *ga {
+                        *ga = score
+                    }
+
+                    alpha = score;
+                }
             } else {
                 scores.push(score);
             }
-        }
+        // }
     }
 
     //Check to make sure we have some scores and if so find the highest score and return it.
@@ -209,7 +241,7 @@ fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, to
 /// This function is used to find the lowest score possible for any given board assuming the ai chooses
 /// The path that guarantees the ai the most amount of points.  Effectively it chooses the move with the lowest guaranteed score.
 /// This function is only called on opponent moves.
-fn search_min(alpha: f64, mut beta: f64, board: Box<Board>, mut depth: isize, total_score: f64, previous_boards: Arc<Vec<BitBoard>>) -> Option<f64> {
+fn search_min(alpha: f64, mut beta: f64, global_alpha: Arc<Mutex<f64>>, mut global_beta: Arc<Mutex<f64>>, board: Box<Board>, mut depth: isize, total_score: f64, previous_boards: Arc<Vec<BitBoard>>) -> Option<f64> {
     //Add one the the depth.
     depth += 1;
 
@@ -247,11 +279,11 @@ fn search_min(alpha: f64, mut beta: f64, board: Box<Board>, mut depth: isize, to
         score += total_score;
 
         //Check if this move breaks the threefold rule.
-        if !is_threefold(*result.combined(), previous_boards.clone()) {
+        // if !is_threefold(*result.combined(), previous_boards.clone()) {
             //Check if we are too deep.  If not then add the result of search_min() to the score and add score to scores.\
             //Otherwise just add score to scores.
             if depth < MAXDEPTH {
-                match search_max(alpha, beta, Box::new(result), depth, score, previous_boards.clone()) {
+                match search_max(alpha, beta, global_alpha, global_beta, Box::new(result), depth, score, previous_boards.clone()) {
                     Some(s) => {
                         score += s;
                         scores.push(score);
@@ -259,15 +291,18 @@ fn search_min(alpha: f64, mut beta: f64, board: Box<Board>, mut depth: isize, to
                             // println!("Pruned min score: {} alpha: {}", score, alpha);
                             return Some(alpha)
                         } else if score < beta {
+                            let gb = global_beta.lock().unwrap();
                             beta = score;
                         }
                     },
-                    None => {}
+                    None => {
+                        // println!("None")
+                    }
                 };
             } else {
                 scores.push(score);
             }
-        }
+        // }
     }
 
     //Check to make sure we have some scores and if so find the lowest score and return it.
