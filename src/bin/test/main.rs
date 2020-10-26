@@ -12,16 +12,16 @@ mod gameboard;
 fn main() {
     println!("Hello, world!");
 
-    // let board = Box::new(Board::default());
-    let board: Box<Board> = Box::new(BoardBuilder::new()
-        .piece(Square::A1, Piece::Queen, Color::White)
-        .piece(Square::B1, Piece::Queen, Color::White)
-        .piece(Square::C1, Piece::Queen, Color::White)
-        .piece(Square::D1, Piece::Queen, Color::White)
-        .piece(Square::E1, Piece::King, Color::White)
-        .piece(Square::E8, Piece::King, Color::Black)
-        .side_to_move(Color::White)
-        .try_into().unwrap());
+    let board = Box::new(Board::default());
+    // let board: Box<Board> = Box::new(BoardBuilder::new()
+    //     .piece(Square::A1, Piece::Queen, Color::White)
+    //     .piece(Square::B1, Piece::Queen, Color::White)
+    //     .piece(Square::C1, Piece::Queen, Color::White)
+    //     .piece(Square::D1, Piece::Queen, Color::White)
+    //     .piece(Square::E1, Piece::King, Color::White)
+    //     .piece(Square::E8, Piece::King, Color::Black)
+    //     .side_to_move(Color::White)
+    //     .try_into().unwrap());
 
     println!("{}", board.piece_on(Square::C1).unwrap());
     game_loop(board);
