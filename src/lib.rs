@@ -34,7 +34,7 @@ static OUTCOMES: Outcomes = Outcomes {
 };
 
 const NUMTHREADS: usize = 8;            //NUMTHREADS is the number of threads to run the ai on.
-const MAXDEPTH: isize = 6;              //The max number of moves run.
+const MAXDEPTH: isize = 5;              //The max number of moves run.
 const OUTCOMESMULTIPLIER: f64 = 2.5;    //Number to multiply the outcomes by.
 // const NEXTMOVEMULTIPLIER: f64 = 2.0; //A higher number increases the points that
 const TAKEPIECEMULTIPLIER: f64 = 1.01;  //Applied when taking a piece not when losing a piece.
@@ -52,7 +52,7 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
 
     let it = MoveGen::new_legal(&board);                     //Get a iterator of next legal moves.
     let length = it.len();                                  //Size of the iterator.  Used later to set an endpoint for the rx.
-    let mut moves: Vec<(ChessMove, f64, isize)> = vec![];             //Initialize a vector of empty moves and points that the move could lead to.
+    let mut moves: Vec<(ChessMove, f64, bool)> = vec![];             //Initialize a vector of empty moves and points that the move could lead to.
                                                                             //The final move will be selected from this vector.
     let pool = ThreadPool::new(NUMTHREADS);     //Thread pool which will run the ai.
 
@@ -84,7 +84,7 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
                 },
                 None => {}
             };
-            match board.status() {
+            match result.status() {
                 BoardStatus::Checkmate => {
                     score += OUTCOMES.their_checkmate;
                     is_mate = true;
@@ -92,32 +92,30 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
                 _ => {}
             };
 
+            let mut ga = global_alpha.lock().unwrap().clone();
+            let gb = global_beta.lock().unwrap().clone();
             let mut their_score = 0.0;
-            // if !is_threefold(*result.combined(), previous_boards.clone()) {
-                if !is_mate {
-                    match search_min(f64::MIN, f64::MAX, global_alpha.clone(), global_beta.clone(), Box::new(result), 1, score, previous_boards.clone()) {
-                        Some(s) => {
-                            // println!("Score: {}", s);
-                            // tx.send(Some((i, s + score, 0)));
-                            their_score = s;
-                        }
-                        None => {
-                            // tx.send(None);
-                        }
-                    };
+            match search_min(ga, gb, global_alpha.clone(), global_beta.clone(), Box::new(result), 1, score, previous_boards.clone()) {
+                Some(s) => {
+                    their_score = s;
                 }
+                None => {
+                }
+            };
+
+            {
                 let mut ga = global_alpha.lock().unwrap();
                 let gb = global_beta.lock().unwrap();
+
+                //Perform alpha beta pruning.
                 if score >= *gb {
-                    // println!("Pruned max score: {} beta: {}", score, gb);
-                    tx.send(Some((i, their_score, 0)));
+                    tx.send(Some((i, their_score, is_mate)));
+                    return;
                 } else if score > *ga {
-                    // println!("new global alpha: {}", score);
                     *ga = score;
                 }
                 tx.send(None);
-                // tx.send(Some((i, their_score + score, 0)));
-            // }
+            }
         })
     }
 
@@ -136,6 +134,10 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
         let mut max: f64 = moves.get(0).unwrap().1;
         let mut selected_move = moves.get(0).unwrap().0;
         for i in moves {
+            println!("Score: {}", i.1);
+            // if i.2 {
+            //     return Some(i.0)
+            // }
             if i.1 > max {
                 selected_move = i.0;
                 max = i.1;
@@ -192,47 +194,39 @@ fn search_max(mut alpha: f64, beta: f64, mut global_alpha: Arc<Mutex<f64>>, glob
         score += total_score;
 
         //Check if this move breaks the threefold rule.
-        // if !is_threefold(*result.combined(), previous_boards.clone()) {
-            //Check if we are too deep.  If not then add the result of search_min() to the score and add score to scores.\
-            //Otherwise just add score to scores.
-            let mut their_score = 0.0;
-            if depth < MAXDEPTH {
-                if !is_mate {
-                    match search_min(alpha, beta, global_alpha.clone(), global_beta.clone(), Box::new(result), depth, score, previous_boards.clone()) {
-                        Some(s) => {
-                            their_score = s;
+        //Check if we are too deep.  If not then add the result of search_min() to the score and add score to scores.\
+        //Otherwise just add score to scores.
+        let mut their_score = 0.0;
+        if depth < MAXDEPTH {
+            // if !is_mate {
+                match search_min(alpha, beta, global_alpha.clone(), global_beta.clone(), Box::new(result), depth, score, previous_boards.clone()) {
+                    Some(s) => {
+                        their_score = s;
+                    },
+                    None => {}
+                };
+            // }
 
-                            // score += s;
-                            // scores.push(score);
-                            // if score >= beta {
-                            //     // println!("Pruned max score: {} beta: {}", score, beta);
-                            //     return Some(beta)
-                            // } else if score > alpha {
-                            //     alpha = score;
-                            // }
-                        },
-                        None => {
+            //Add the score to the list of scores.
+            score += their_score;
+            scores.push(score);
 
-                        }
-                    };
+            //Perform alpha beta pruning.
+            if score >= beta {
+                return Some(beta)
+            } else if score > alpha {
+                //Get global alpha and check if score is greater than it. If so set global alpha to score.
+                let mut ga = global_alpha.lock().unwrap();
+                if score > *ga {
+                    *ga = score;
                 }
-                score += their_score;
-                scores.push(score);
-                if score >= beta {
-                    // println!("Pruned max score: {} beta: {}", score, beta);
-                    return Some(beta)
-                } else if score > alpha {
-                    let mut ga = global_alpha.lock().unwrap();
-                    if score > *ga {
-                        *ga = score;
-                        // println!("new global alpha: {}", score);
-                    }
-                    alpha = score;
-                }
-            } else {
-                scores.push(score);
+
+                //Update our local alpha.
+                alpha = *ga;
             }
-        // }
+        } else {
+            scores.push(score);
+        }
     }
 
     //Check to make sure we have some scores and if so find the highest score and return it.
@@ -269,6 +263,7 @@ fn search_min(alpha: f64, mut beta: f64, global_alpha: Arc<Mutex<f64>>, mut glob
         board.make_move(i, &mut result);
 
         let mut score = 0.0;
+        let mut is_mate = false;
 
         //If the target square is a piece then subtract the taken pieces points to score.
         match target {
@@ -282,6 +277,7 @@ fn search_min(alpha: f64, mut beta: f64, global_alpha: Arc<Mutex<f64>>, mut glob
         match result.status() {
             BoardStatus::Checkmate => {
                 score -= OUTCOMES.my_checkmate;
+                is_mate = true;
             },
             _ => {}
         };
@@ -289,35 +285,41 @@ fn search_min(alpha: f64, mut beta: f64, global_alpha: Arc<Mutex<f64>>, mut glob
         //Add previous total scores to score.
         score += total_score;
 
-        //Check if this move breaks the threefold rule.
-        // if !is_threefold(*result.combined(), previous_boards.clone()) {
-            //Check if we are too deep.  If not then add the result of search_min() to the score and add score to scores.\
-            //Otherwise just add score to scores.
-            if depth < MAXDEPTH {
+        //Check if we are too deep.  If not then add the result of search_min() to the score and add score to scores.\
+        //Otherwise just add score to scores.
+        let mut their_score = 0.0;
+        if depth < MAXDEPTH {
+            // if !is_mate {
                 match search_max(alpha, beta, global_alpha.clone(), global_beta.clone(), Box::new(result), depth, score, previous_boards.clone()) {
                     Some(s) => {
-                        score += s;
-                        scores.push(score);
-                        if score <= alpha {
-                            // println!("Pruned min score: {} alpha: {}", score, alpha);
-                            return Some(alpha)
-                        } else if score < beta {
-                            let mut gb = global_beta.lock().unwrap();
-                            if score < *gb {
-                                // println!("new global beta: {}", score);
-                                *gb = score;
-                            }
-                            beta = score;
-                        }
+                        their_score = s;
                     },
                     None => {
                         // println!("None")
                     }
                 };
-            } else {
-                scores.push(score);
+            // }
+
+            //Add the score to the list of scores.
+            score += their_score;
+            scores.push(score);
+
+            //Perform alpha beta pruning.
+            if score <= alpha {
+                return Some(alpha)
+            } else if score < beta {
+                //Get global beta and check if score is greater than it. If so set global beta to score.
+                let mut gb = global_beta.lock().unwrap();
+                if score < *gb {
+                    *gb = score;
+                }
+
+                //Update our local beta.
+                beta = *gb;
             }
-        // }
+        } else {
+            scores.push(score);
+        }
     }
 
     //Check to make sure we have some scores and if so find the lowest score and return it.
@@ -335,6 +337,15 @@ fn search_min(alpha: f64, mut beta: f64, global_alpha: Arc<Mutex<f64>>, mut glob
         return Some(min);
     }
     return None;
+}
+
+fn evaluate(board: Board, color: Color) {
+    let mut my_score = 0.0;
+    let mut their_score = 0.0;
+
+    for square in board.color_combined(color) {
+        my_score +=
+    }
 }
 
 /// Check to make see if the BitBoard of board is found in boards more than once.
