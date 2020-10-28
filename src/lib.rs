@@ -114,7 +114,6 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
         let mut max: f64 = moves.get(0).unwrap().1;
         let mut selected_move = moves.get(0).unwrap().0;
         for i in moves {
-            println!("Score: {}", i.1);
             if i.2 {
                 return Some(i.0)
             }
