@@ -56,9 +56,6 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
                                                                             //The final move will be selected from this vector.
     let pool = ThreadPool::new(NUMTHREADS);     //Thread pool which will run the ai.
 
-    let global_alpha = Arc::new(Mutex::new(f64::MIN));
-    let global_beta = Arc::new(Mutex::new(f64::MAX));
-
     //Thread safe message passing.  Used to pass out the moves and scores out of the thread.
     let (tx, rx) = channel();
     //Loop through each possible move.
@@ -66,8 +63,6 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
         let tx = tx.clone();
         let board = board.clone();
         let previous_boards:Arc<Vec<BitBoard>> = Arc::clone(&previous_boards);
-        let global_alpha = global_alpha.clone();
-        let global_beta = global_beta.clone();
         pool.execute(move|| {
             let target = board.piece_on(i.get_dest());  //Gets the target piece of the move.  None if there is no target piece.
 
@@ -91,11 +86,8 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
                 },
                 _ => {}
             };
-
-            let mut ga = global_alpha.lock().unwrap().clone();
-            let gb = global_beta.lock().unwrap().clone();
             let mut their_score = 0.0;
-            match search_min(ga, gb, global_alpha.clone(), global_beta.clone(), Box::new(result), 1, score, previous_boards.clone()) {
+            match search_min(f64::MIN, f64::MAX, Box::new(result), 1, score, previous_boards.clone()) {
                 Some(s) => {
                     their_score = s;
                 }
@@ -103,19 +95,7 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
                 }
             };
 
-            {
-                let mut ga = global_alpha.lock().unwrap();
-                let gb = global_beta.lock().unwrap();
-
-                //Perform alpha beta pruning.
-                if score >= *gb {
-                    tx.send(Some((i, their_score, is_mate)));
-                    return;
-                } else if score > *ga {
-                    *ga = score;
-                }
-                tx.send(None);
-            }
+            tx.send(Some((i, their_score, is_mate)));
         })
     }
 
@@ -135,9 +115,9 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
         let mut selected_move = moves.get(0).unwrap().0;
         for i in moves {
             println!("Score: {}", i.1);
-            // if i.2 {
-            //     return Some(i.0)
-            // }
+            if i.2 {
+                return Some(i.0)
+            }
             if i.1 > max {
                 selected_move = i.0;
                 max = i.1;
@@ -146,15 +126,13 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
         println!("Max Score: {}", max);
         Some(selected_move)
     } else { None }
-
-    // return Some(ChessMove::new(Square::A1, Square::A2, None))
 }
 
 /// Searches all possible moves for a given board and returns the maximum score plus the score of search_min().
 /// This function is used to find the highest score possible for any given board assuming the opponent chooses
 /// The path that costs the ai the most amount of points.  Effectively it chooses the move with the highest guaranteed score.
 /// This function is only called on ai moves.
-fn search_max(mut alpha: f64, beta: f64, mut global_alpha: Arc<Mutex<f64>>, global_beta: Arc<Mutex<f64>>, board: Box<Board>, mut depth: isize, total_score: f64, previous_boards: Arc<Vec<BitBoard>>) -> Option<f64> {
+fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, total_score: f64, previous_boards: Arc<Vec<BitBoard>>) -> Option<f64> {
     //Add one the the depth.
     depth += 1;
 
@@ -199,7 +177,7 @@ fn search_max(mut alpha: f64, beta: f64, mut global_alpha: Arc<Mutex<f64>>, glob
         let mut their_score = 0.0;
         if depth < MAXDEPTH {
             // if !is_mate {
-                match search_min(alpha, beta, global_alpha.clone(), global_beta.clone(), Box::new(result), depth, score, previous_boards.clone()) {
+                match search_min(alpha, beta, Box::new(result), depth, score, previous_boards.clone()) {
                     Some(s) => {
                         their_score = s;
                     },
@@ -215,14 +193,7 @@ fn search_max(mut alpha: f64, beta: f64, mut global_alpha: Arc<Mutex<f64>>, glob
             if score >= beta {
                 return Some(beta)
             } else if score > alpha {
-                //Get global alpha and check if score is greater than it. If so set global alpha to score.
-                let mut ga = global_alpha.lock().unwrap();
-                if score > *ga {
-                    *ga = score;
-                }
-
-                //Update our local alpha.
-                alpha = *ga;
+                 alpha = score;
             }
         } else {
             scores.push(score);
@@ -246,7 +217,7 @@ fn search_max(mut alpha: f64, beta: f64, mut global_alpha: Arc<Mutex<f64>>, glob
 /// This function is used to find the lowest score possible for any given board assuming the ai chooses
 /// The path that guarantees the ai the most amount of points.  Effectively it chooses the move with the lowest guaranteed score.
 /// This function is only called on opponent moves.
-fn search_min(alpha: f64, mut beta: f64, global_alpha: Arc<Mutex<f64>>, mut global_beta: Arc<Mutex<f64>>, board: Box<Board>, mut depth: isize, total_score: f64, previous_boards: Arc<Vec<BitBoard>>) -> Option<f64> {
+fn search_min(alpha: f64, mut beta: f64, board: Box<Board>, mut depth: isize, total_score: f64, previous_boards: Arc<Vec<BitBoard>>) -> Option<f64> {
     //Add one the the depth.
     depth += 1;
 
@@ -290,7 +261,7 @@ fn search_min(alpha: f64, mut beta: f64, global_alpha: Arc<Mutex<f64>>, mut glob
         let mut their_score = 0.0;
         if depth < MAXDEPTH {
             // if !is_mate {
-                match search_max(alpha, beta, global_alpha.clone(), global_beta.clone(), Box::new(result), depth, score, previous_boards.clone()) {
+                match search_max(alpha, beta, Box::new(result), depth, score, previous_boards.clone()) {
                     Some(s) => {
                         their_score = s;
                     },
@@ -308,14 +279,7 @@ fn search_min(alpha: f64, mut beta: f64, global_alpha: Arc<Mutex<f64>>, mut glob
             if score <= alpha {
                 return Some(alpha)
             } else if score < beta {
-                //Get global beta and check if score is greater than it. If so set global beta to score.
-                let mut gb = global_beta.lock().unwrap();
-                if score < *gb {
-                    *gb = score;
-                }
-
-                //Update our local beta.
-                beta = *gb;
+                beta = score;
             }
         } else {
             scores.push(score);
@@ -327,10 +291,6 @@ fn search_min(alpha: f64, mut beta: f64, global_alpha: Arc<Mutex<f64>>, mut glob
         let mut min = *scores.get(0).expect("Error unwrapping score.");
         for score in scores {
             if score < min {
-                let mut gb = global_beta.lock().unwrap();
-                if score < *gb {
-                    *gb = score;
-                }
                 min = score;
             }
         }
@@ -339,14 +299,20 @@ fn search_min(alpha: f64, mut beta: f64, global_alpha: Arc<Mutex<f64>>, mut glob
     return None;
 }
 
-fn evaluate(board: Board, color: Color) {
-    let mut my_score = 0.0;
-    let mut their_score = 0.0;
-
-    for square in board.color_combined(color) {
-        my_score +=
-    }
-}
+//Maybe used in the future.  Alternative to adding the points as we go along.
+// fn evaluate(board: Board, color: Color) -> f64 {
+//     let mut my_score = 0.0;
+//     let mut their_score = 0.0;
+//
+//     for square in *board.color_combined(color) {
+//         my_score += match_piece(board.piece_on(square).unwrap());
+//     }
+//     for square in *board.color_combined(!color) {
+//         their_score += match_piece(board.piece_on(square).unwrap());
+//     }
+//
+//     my_score - their_score
+// }
 
 /// Check to make see if the BitBoard of board is found in boards more than once.
 /// Returns true if the threefold criteria is met.  Otherwise returns false.
