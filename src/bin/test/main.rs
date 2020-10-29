@@ -1,9 +1,10 @@
 use chess_player::do_move;
 
-use chess::{Board, Color, Square, ChessMove, BoardStatus, Game, BitBoard};
+use chess::{Board, Color, Square, ChessMove, BoardStatus, Game, BitBoard, BoardBuilder, Piece};
 use dialoguer::Input;
 use dialoguer::theme::ColorfulTheme;
 use std::process::exit;
+use std::convert::TryInto;
 use std::sync::Arc;
 
 mod gameboard;
@@ -12,6 +13,16 @@ fn main() {
     println!("Hello, world!");
 
     let board = Box::new(Board::default());
+    // let board: Box<Board> = Box::new(BoardBuilder::new()
+    //     .piece(Square::A1, Piece::Queen, Color::White)
+    //     .piece(Square::B1, Piece::Queen, Color::White)
+    //     .piece(Square::C1, Piece::Queen, Color::White)
+    //     .piece(Square::D1, Piece::Queen, Color::White)
+    //     .piece(Square::E1, Piece::King, Color::White)
+    //     .piece(Square::E8, Piece::King, Color::Black)
+    //     .side_to_move(Color::White)
+    //     .try_into().unwrap());
+
     println!("{}", board.piece_on(Square::C1).unwrap());
     game_loop(board);
 }
@@ -63,21 +74,18 @@ fn update(board: Box<Board>, boards: Arc<Vec<BitBoard>>, game: &mut Game) -> (St
 
     // Uncomment for user input on White.
     // if board.side_to_move() == Color::White {
-    //     let piece: String = get_input(board.clone(),"Select a piece");
-    //     let to = get_input(board.clone(), "Select a space to move to");
-    //
-    //     let result = match make_move(&piece, &to, board.clone(), game) {
-    //         Some(r) => Box::new(r),
-    //         None => return (piece, board)
-    //     };
-    //
-    //     gameboard::draw(result.clone());
-    //     return (piece, result.into());
+    //    let piece: String = get_input(board.clone(),"Select a piece");
+    //    let to = get_input(board.clone(), "Select a space to move to");
+    //    let result = match make_move(&piece, &to, board.clone(), game) {
+    //        Some(r) => Box::new(r),
+    //        None => return (piece, board)
+    //    };
+    //    gameboard::draw(result.clone());
+    //    return (piece, result.into());
     // } else {
         let result = Box::new(make_ai_move(do_move(board.clone(), board.side_to_move(), boards).unwrap_or_default(), board, game));
         println!("#");
         gameboard::draw(result.clone());
-
         return (piece, result.into());
     // }
 
@@ -93,7 +101,7 @@ fn get_input(board: Box<Board>, prompt: &str) -> String {
             _ => "White"
         }))
         .default(".".into())
-        .interact_text().unwrap()
+        .interact().unwrap()
         .to_uppercase()
 }
 
