@@ -3,7 +3,7 @@
 use chess::{Board, ChessMove, Color, MoveGen, Piece, BoardStatus, BitBoard};
 use threadpool::ThreadPool;
 use std::sync::mpsc::channel;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 //Outcomes is a struct to organize all the possible point values.
 pub struct Outcomes {
@@ -24,8 +24,8 @@ static OUTCOMES: Outcomes = Outcomes {
     draw: 500.0,
     my_checkmate: 1000.0,
     my_check: 100.0,
-    their_checkmate: -1000.0,
-    their_check: -100.0,
+    their_checkmate: 1000.0,
+    their_check: 100.0,
     queen: 100.0,
     knight: 50.0,
     bishop: 50.0,
@@ -39,8 +39,11 @@ const OUTCOMESMULTIPLIER: f64 = 2.5;    //Number to multiply the outcomes by.
 // const NEXTMOVEMULTIPLIER: f64 = 2.0; //A higher number increases the points that
 const TAKEPIECEMULTIPLIER: f64 = 1.01;  //Applied when taking a piece not when losing a piece.
 
-//Main entry point for the ai.  Board is the current board state, color is the color of the side the bot is on, and previous_boards is a vector of all the previous
-//BitBoards and is used to enforce the threefold rule in the ai.
+/// Main entry point for the ai.  Board is the current board state,
+/// color is the color of the side the bot is on, and previous_boards is a vector of all the previous
+/// BitBoards and is used to enforce the threefold rule in the ai.
+/// Inside pool.execute() the code is very similar to search_max() however later we may want to add some
+/// top level specific code.
 pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoard>>) -> Option<ChessMove> {
     //Check to make sure the ai is moving next.
     if board.side_to_move() != color {
@@ -49,7 +52,7 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
 
     let it = MoveGen::new_legal(&board);                     //Get a iterator of next legal moves.
     let length = it.len();                                  //Size of the iterator.  Used later to set an endpoint for the rx.
-    let mut moves: Vec<(ChessMove, f64, isize)> = vec![];             //Initialize a vector of empty moves and points that the move could lead to.
+    let mut moves: Vec<(ChessMove, f64, bool)> = vec![];             //Initialize a vector of empty moves and points that the move could lead to.
                                                                             //The final move will be selected from this vector.
     let pool = ThreadPool::new(NUMTHREADS);     //Thread pool which will run the ai.
 
@@ -57,69 +60,43 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
     let (tx, rx) = channel();
     //Loop through each possible move.
     for i in it {
-        //Clone variables needed in the thread.
         let tx = tx.clone();
         let board = board.clone();
         let previous_boards:Arc<Vec<BitBoard>> = Arc::clone(&previous_boards);
-        //Start the thread.
         pool.execute(move|| {
-            //get the target piece of the move.  If the move is not going take a piece the target will be None
-            let target = board.piece_on(i.get_dest());
-            //Make the move i and put the resulting board in result.
+            let target = board.piece_on(i.get_dest());  //Gets the target piece of the move.  None if there is no target piece.
+
+            //Make a the move and put the board in result.
             let mut result = Board::from(*board.clone());
             board.make_move(i, &mut result);
 
-            //Current score of the move.  The score of this move and the scores of consecutive moves get added to local_score.
-            let mut local_score: f64 = 0.0;
+            let mut score = 0.0;
+            let mut is_mate = false;
 
-            //Check if target is something and if the move involes the ai's color taking a piece then and the points to local_score.
-            //Otherwise if it is not the ai's move then subtract the points from local_score.
-            //If there is no piece being taken do nothing.
             match target {
                 Some(t) => {
-                    if color == board.side_to_move() {
-                        local_score += match_piece(t) * OUTCOMESMULTIPLIER * TAKEPIECEMULTIPLIER;
-                    } else {
-                        local_score -= match_piece(t) * OUTCOMESMULTIPLIER;
-                    }
+                    score += match_piece(t);
                 },
-                None => {},
-            }
-            //If a move's outcome is checkmate add or subtract the points from local_score depending on who is making the move.
-            //If there is not a checkmate do noting.
-            match board.status() {
+                None => {}
+            };
+            match result.status() {
                 BoardStatus::Checkmate => {
-                    if board.side_to_move() == color {
-                        local_score += OUTCOMES.my_checkmate * OUTCOMESMULTIPLIER;
-                    } else {
-                        local_score += OUTCOMES.their_checkmate * OUTCOMESMULTIPLIER;
-                    }
+                    score += OUTCOMES.their_checkmate;
+                    is_mate = true;
                 },
                 _ => {}
             };
-
-            //Call check_moves with the result.  This will continue the chain of checking moves.
-            //If check_moves returns a score add it to local_score.
-            match check_moves(Box::new(result), color, 1, previous_boards.clone()) {
-                Some((_, s, _)) => {
-                    if color == board.side_to_move() {
-                        local_score += s;
-                    }
-                    // moves.push((i, local_score, d));
-                },
+            let mut their_score = 0.0;
+            match search_min(f64::MIN, f64::MAX, Box::new(result), 1, score, previous_boards.clone()) {
+                Some(s) => {
+                    their_score = s;
+                }
                 None => {
-                    // moves.push((i, local_score, 0));
-                },
+                }
             };
 
-            //If this move does not break the threefold rule send the move and its score through tx.
-            //Otherwise send nothing.
-            if !is_threefold(*result.color_combined(color), previous_boards.clone()) {
-                tx.send(Some((i, local_score, 0)));
-            } else {
-                tx.send(None);
-            }
-        });
+            tx.send(Some((i, their_score, is_mate)));
+        })
     }
 
     //Match the values sent by the txs into moves if the value sent by tx is not None.
@@ -132,106 +109,212 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
         };
     }
 
-    //If the lenght of moves is zero then return none.  Otherwise find the move with the highest score and return it.
+    //If the length of moves is zero then return none.  Otherwise find the move with the highest score and return it.
     if moves.len() > 0 {
         let mut max: f64 = moves.get(0).unwrap().1;
         let mut selected_move = moves.get(0).unwrap().0;
         for i in moves {
+            if i.2 {
+                return Some(i.0)
+            }
             if i.1 > max {
                 selected_move = i.0;
                 max = i.1;
             }
         }
+        println!("Max Score: {}", max);
         Some(selected_move)
     } else { None }
-
-    // return Some(ChessMove::new(Square::A1, Square::A2, None))
 }
 
-//Recursively check all moves possible on board and return the best move and the sum of all the scores.
-//Board is the current board to check, color is the color of the side the ai is on, depth is how far into the moves the ai is on to make sure the recursion dosn't go
-// on forever, boards is the list of previous board positions to enforce the threefold rule in the ai.
-fn check_moves(board: Box<Board>, color: Color, mut depth: isize,  boards: Arc<Vec<BitBoard>>) -> Option<(ChessMove, f64, isize)> {
-    //Add one the the depth and make sure we aren't to deep.  If depth is over the MAXDEPTH return None.
+/// Searches all possible moves for a given board and returns the maximum score plus the score of search_min().
+/// This function is used to find the highest score possible for any given board assuming the opponent chooses
+/// The path that costs the ai the most amount of points.  Effectively it chooses the move with the highest guaranteed score.
+/// This function is only called on ai moves.
+fn search_max(mut alpha: f64, beta: f64, board: Box<Board>, mut depth: isize, total_score: f64, previous_boards: Arc<Vec<BitBoard>>) -> Option<f64> {
+    //Add one the the depth.
     depth += 1;
-    if depth > MAXDEPTH {
-        return None;
-    }
 
+    let it = MoveGen::new_legal(&board);
+    let mut scores = vec![];
 
-    let it = MoveGen::new_legal(&board);               //Get a iterator of next legal moves.
-    let mut moves: Vec<(ChessMove, f64, isize)> = vec![];       //Initialize a vector of empty moves and points that the move could lead to.
-    let max_depth = depth;                                //Currently not used.  TODO remember why I put this in here.
-    let mut local_score: f64 = 0.0;                             //Sum of this boards move scores and consecutive move scores.
-
-    //Iterate over all possible moves.
+    //Loop through each possible move.
     for i in it {
-        let target = board.piece_on(i.get_dest());  //Gets the target piece of the move.  None if there is no target piece.
+        //Gets the target piece of the move.  None if there is no target piece.
+        let target = board.piece_on(i.get_dest());
 
         //Make a the move and put the board in result.
         let mut result = Board::from(*board.clone());
         board.make_move(i, &mut result);
 
-        //If there is a target piece then add or subtract the points form local_score depending on which color is making the move.
+        let mut score = 0.0;
+        let mut is_mate = false;
+
+        //If the target square is a piece then add the taken pieces points to score.
         match target {
             Some(t) => {
-                if color == board.side_to_move() {
-                    local_score += match_piece(t) / depth as f64 * OUTCOMESMULTIPLIER;
-                } else {
-                    local_score -= match_piece(t) / depth as f64 * OUTCOMESMULTIPLIER;
-                }
+                score += match_piece(t);
+                is_mate = true;
             },
-            None => {},
-        }
+            None => {}
+        };
 
-        //If a move's outcome is checkmate add or subtract the points from local_score depending on who is making the move.
-        //If there is not a checkmate do noting.
-        match board.status() {
+        //If this move leads to checkmate then add the checkmate points to score.
+        match result.status() {
             BoardStatus::Checkmate => {
-                if board.side_to_move() == color {
-                    local_score += OUTCOMES.my_checkmate / depth as f64 * OUTCOMESMULTIPLIER;
-                } else {
-                    local_score += OUTCOMES.their_checkmate / depth as f64 * OUTCOMESMULTIPLIER;
-                }
+                score += OUTCOMES.their_checkmate;
             },
             _ => {}
         };
 
-        //Recursivly call check_moves and if it returns something add the score to local_score.
-        match check_moves(Box::new(result), color, depth, boards.clone()) {
-            Some((_, s, _)) => {
-                if color == board.side_to_move() {
-                    local_score += s;
-                }
-            },
-            None => {
-            },
-        };
+        //Add previous total scores to score.
+        score += total_score;
 
-        //If the threefold criteria are not met then push the current move and score onto moves.
-        if !is_threefold(*result.color_combined(color), boards.clone()) {
-            moves.push((i, local_score, max_depth));
+        //Check if this move breaks the threefold rule.
+        //Check if we are too deep.  If not then add the result of search_min() to the score and add score to scores.\
+        //Otherwise just add score to scores.
+        let mut their_score = 0.0;
+        if depth < MAXDEPTH {
+            // if !is_mate {
+                match search_min(alpha, beta, Box::new(result), depth, score, previous_boards.clone()) {
+                    Some(s) => {
+                        their_score = s;
+                    },
+                    None => {}
+                };
+            // }
+
+            //Add the score to the list of scores.
+            score += their_score;
+            scores.push(score);
+
+            //Perform alpha beta pruning.
+            if score >= beta {
+                return Some(beta)
+            } else if score > alpha {
+                 alpha = score;
+            }
+        } else {
+            scores.push(score);
         }
     }
 
-    //Check if moves is empty.  If so return None.
-    //Otherwise find the move with the highest score and return it and local_score.
-    if moves.len() > 0 {
-        let mut max: f64 = moves.get(0).unwrap().1;
-        let mut selected_move = moves.get(0).unwrap().0;
-        for i in moves {
-            if i.1 > max {
-                selected_move = i.0;
-                max = i.1;
+    //Check to make sure we have some scores and if so find the highest score and return it.
+    if scores.len() > 0 {
+        let mut max = *scores.get(0).expect("Error unwrapping score.");
+        for score in scores {
+            if score > max {
+                max = score;
             }
         }
-
-        Some((selected_move, local_score, max_depth))
-    } else { None }
+        return Some(max);
+    }
+    return None;
 }
 
-//Check to make see if the BitBoard of board is found in boards more than once.
-//Returns true if the threefold criteria is met.  Otherwise returns false.
+/// Searches all possible moves for a given board and returns the minimum score plus the score of search_max().
+/// This function is used to find the lowest score possible for any given board assuming the ai chooses
+/// The path that guarantees the ai the most amount of points.  Effectively it chooses the move with the lowest guaranteed score.
+/// This function is only called on opponent moves.
+fn search_min(alpha: f64, mut beta: f64, board: Box<Board>, mut depth: isize, total_score: f64, previous_boards: Arc<Vec<BitBoard>>) -> Option<f64> {
+    //Add one the the depth.
+    depth += 1;
+
+    let it = MoveGen::new_legal(&board);
+    let mut scores = vec![];
+
+    //Loop through each possible move.
+    for i in it {
+        //Gets the target piece of the move.  None if there is no target piece.
+        let target = board.piece_on(i.get_dest());
+
+        //Make a the move and put the board in result.
+        let mut result = Board::from(*board.clone());
+        board.make_move(i, &mut result);
+
+        let mut score = 0.0;
+        let mut is_mate = false;
+
+        //If the target square is a piece then subtract the taken pieces points to score.
+        match target {
+            Some(t) => {
+                score -= match_piece(t);
+            },
+            None => {}
+        };
+
+        //If this move leads to checkmate then subtract the checkmate points to score.
+        match result.status() {
+            BoardStatus::Checkmate => {
+                score -= OUTCOMES.my_checkmate;
+                is_mate = true;
+            },
+            _ => {}
+        };
+
+        //Add previous total scores to score.
+        score += total_score;
+
+        //Check if we are too deep.  If not then add the result of search_min() to the score and add score to scores.\
+        //Otherwise just add score to scores.
+        let mut their_score = 0.0;
+        if depth < MAXDEPTH {
+            // if !is_mate {
+                match search_max(alpha, beta, Box::new(result), depth, score, previous_boards.clone()) {
+                    Some(s) => {
+                        their_score = s;
+                    },
+                    None => {
+                        // println!("None")
+                    }
+                };
+            // }
+
+            //Add the score to the list of scores.
+            score += their_score;
+            scores.push(score);
+
+            //Perform alpha beta pruning.
+            if score <= alpha {
+                return Some(alpha)
+            } else if score < beta {
+                beta = score;
+            }
+        } else {
+            scores.push(score);
+        }
+    }
+
+    //Check to make sure we have some scores and if so find the lowest score and return it.
+    if scores.len() > 0 {
+        let mut min = *scores.get(0).expect("Error unwrapping score.");
+        for score in scores {
+            if score < min {
+                min = score;
+            }
+        }
+        return Some(min);
+    }
+    return None;
+}
+
+//Maybe used in the future.  Alternative to adding the points as we go along.
+// fn evaluate(board: Board, color: Color) -> f64 {
+//     let mut my_score = 0.0;
+//     let mut their_score = 0.0;
+//
+//     for square in *board.color_combined(color) {
+//         my_score += match_piece(board.piece_on(square).unwrap());
+//     }
+//     for square in *board.color_combined(!color) {
+//         their_score += match_piece(board.piece_on(square).unwrap());
+//     }
+//
+//     my_score - their_score
+// }
+
+/// Check to make see if the BitBoard of board is found in boards more than once.
+/// Returns true if the threefold criteria is met.  Otherwise returns false.
 fn is_threefold(board: BitBoard, boards: Arc<Vec<BitBoard>>) -> bool {
     if boards.iter().filter(|&b| *b == board).count() >= 2 {
         // println!("Threefold");
@@ -240,7 +323,7 @@ fn is_threefold(board: BitBoard, boards: Arc<Vec<BitBoard>>) -> bool {
     return false;
 }
 
-//Match a Chess Piece to a score.
+/// Match a Chess Piece to a score.
 fn match_piece(piece: Piece) -> f64 {
     match piece {
         Piece::Rook => OUTCOMES.rook,
