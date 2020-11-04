@@ -89,7 +89,7 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
 
             if is_threefold(*result.combined(), previous_boards.clone()) {
                 // tx.send(None);
-                score += threefold_evaluate(board.clone(), previous_boards.clone());
+                score += threefold_evaluate(board.clone());
             }
 
             let mut their_score = 0.0;
@@ -329,9 +329,8 @@ fn is_threefold(board: BitBoard, boards: Arc<Vec<BitBoard>>) -> bool {
     return false;
 }
 
-fn threefold_evaluate(board: Box<Board>, boards: Arc<Vec<BitBoard>>) -> f64 {
+fn threefold_evaluate(board: Box<Board>) -> f64 {
     let eval = evaluate(board.clone(), board.side_to_move());
-    let num_moves = boards.len();
 
     let mut score = eval - OUTCOMES.draw;
     println!("Threefold eval: {}", score);
