@@ -34,7 +34,7 @@ static OUTCOMES: Outcomes = Outcomes {
 };
 
 const NUMTHREADS: usize = 8;            //NUMTHREADS is the number of threads to run the ai on.
-const MAXDEPTH: isize = 5;              //The max number of moves run.
+const MAXDEPTH: isize = 4;              //The max number of moves run.
 const OUTCOMESMULTIPLIER: f64 = 2.5;    //Number to multiply the outcomes by.
 // const NEXTMOVEMULTIPLIER: f64 = 2.0; //A higher number increases the points that
 const TAKEPIECEMULTIPLIER: f64 = 1.01;  //Applied when taking a piece not when losing a piece.
@@ -86,6 +86,12 @@ pub fn do_move(board: Box<Board>, color: Color, previous_boards: Arc<Vec<BitBoar
                 },
                 _ => {}
             };
+
+            if is_threefold(*result.combined(), previous_boards.clone()) {
+                // tx.send(None);
+                score += threefold_evaluate(board.clone(), previous_boards.clone());
+            }
+
             let mut their_score = 0.0;
             match search_min(f64::MIN, f64::MAX, Box::new(result), 1, score, previous_boards.clone()) {
                 Some(s) => {
@@ -298,20 +304,20 @@ fn search_min(alpha: f64, mut beta: f64, board: Box<Board>, mut depth: isize, to
     return None;
 }
 
-//Maybe used in the future.  Alternative to adding the points as we go along.
-// fn evaluate(board: Board, color: Color) -> f64 {
-//     let mut my_score = 0.0;
-//     let mut their_score = 0.0;
-//
-//     for square in *board.color_combined(color) {
-//         my_score += match_piece(board.piece_on(square).unwrap());
-//     }
-//     for square in *board.color_combined(!color) {
-//         their_score += match_piece(board.piece_on(square).unwrap());
-//     }
-//
-//     my_score - their_score
-// }
+// Maybe used in the future.  Alternative to adding the points as we go along.
+fn evaluate(board: Box<Board>, color: Color) -> f64 {
+    let mut my_score = 0.0;
+    let mut their_score = 0.0;
+
+    for square in *board.color_combined(color) {
+        my_score += match_piece(board.piece_on(square).unwrap());
+    }
+    for square in *board.color_combined(!color) {
+        their_score += match_piece(board.piece_on(square).unwrap());
+    }
+
+    my_score - their_score
+}
 
 /// Check to make see if the BitBoard of board is found in boards more than once.
 /// Returns true if the threefold criteria is met.  Otherwise returns false.
@@ -321,6 +327,15 @@ fn is_threefold(board: BitBoard, boards: Arc<Vec<BitBoard>>) -> bool {
         return true;
     }
     return false;
+}
+
+fn threefold_evaluate(board: Box<Board>, boards: Arc<Vec<BitBoard>>) -> f64 {
+    let eval = evaluate(board.clone(), board.side_to_move());
+    let num_moves = boards.len();
+
+    let mut score = eval - OUTCOMES.draw;
+    println!("Threefold eval: {}", score);
+    return score;
 }
 
 /// Match a Chess Piece to a score.

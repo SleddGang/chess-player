@@ -18,7 +18,7 @@ fn main() {
         for line in lines {
             let l = line.unwrap();
             if in_board == false {
-                if l == String::from('#') {
+                if l == String::from("#") {
                     in_board = true;
                 }
             } else if count > 17 {

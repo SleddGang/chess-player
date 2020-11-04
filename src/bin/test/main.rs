@@ -14,7 +14,7 @@ fn main() {
 
     let board = Box::new(Board::default());
     // let board: Box<Board> = Box::new(BoardBuilder::new()
-    //     .piece(Square::A1, Piece::Queen, Color::White)
+        // .piece(Square::A1, Piece::Queen, Color::White)
     //     .piece(Square::B1, Piece::Queen, Color::White)
     //     .piece(Square::C1, Piece::Queen, Color::White)
     //     .piece(Square::D1, Piece::Queen, Color::White)
@@ -23,7 +23,7 @@ fn main() {
     //     .side_to_move(Color::White)
     //     .try_into().unwrap());
 
-    println!("{}", board.piece_on(Square::C1).unwrap());
+    // println!("{}", board.piece_on(Square::C1).unwrap());
     game_loop(board);
 }
 
@@ -48,7 +48,7 @@ fn game_loop(board: Box<Board>) {
 
     while result.0 != String::from("Q") {
         result = update(result.1.clone(), Arc::new(boards.clone()), &mut game);
-        boards.push(*result.1.color_combined(board.side_to_move()));
+        boards.push(*result.1.combined());
         count += 1;
         println!("{}", count);
     }
@@ -84,6 +84,7 @@ fn update(board: Box<Board>, boards: Arc<Vec<BitBoard>>, game: &mut Game) -> (St
     //    return (piece, result.into());
     // } else {
         let result = Box::new(make_ai_move(do_move(board.clone(), board.side_to_move(), boards).unwrap_or_default(), board, game));
+        // println!("{:?}", result.combined().0);
         println!("#");
         gameboard::draw(result.clone());
         return (piece, result.into());
